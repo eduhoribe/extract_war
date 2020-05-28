@@ -1,0 +1,177 @@
+#!/usr/bin/env bash
+
+# .war file extractor
+# 11/06/2019 - Eduwardo Keizo Horibe Junior
+# tip: chmod 744 <this_file>
+
+output_path=/tmp/extract_war_output
+
+function clear_output_file() {
+	rm -f $output_path
+}
+
+clear_output_file
+
+function show_error_message_and_exit() {
+	clear_output_file
+
+	echo "error:  $1"
+	exit 1
+}
+
+function show_info_message_and_exit() {
+	clear_output_file
+	
+	echo "info:   $1"
+	exit 0
+}
+
+# Parametters
+WAR_DIRECTORY=$(pwd)
+DEBUG=false
+FULL_PATH=false
+
+# Read arguments
+POSITIONAL=()
+while [[ $# -gt 0 ]]
+do
+	key="$1"
+
+	case $key in
+		-d|--directory)
+			WAR_DIRECTORY="$2"
+			if [ -z "$WAR_DIRECTORY" ]; then
+				show_error_message_and_exit "Empty directory"
+			fi
+			shift
+			shift
+			;;
+		--debug)
+			DEBUG=true
+			shift
+			;;
+		-f|--full_path)
+			FULL_PATH=true
+			shift
+			;;
+		-h|--help)
+			#TODO
+			echo "Pending of implementation"
+			exit 0
+			;;
+		*) # unknown option
+			show_error_message_and_exit "invalid option $key"
+			;;
+	esac
+done
+set -- "${POSITIONAL[@]}" # restore positional parameters
+
+function will_show_debug_messages() {
+	$DEBUG
+}
+
+function show_debug_message() {
+	if will_show_debug_messages; then
+		echo "debug:  $1"
+	fi
+}
+
+function will_crop_path() {
+	echo ! "$FULL_PATH"
+}
+
+if will_show_debug_messages; then
+	echo "-----------Parametters-----------"
+	echo "-> War directory: $WAR_DIRECTORY"
+	echo "-> Debug mode   : $DEBUG"
+	echo "-> Full path    : $FULL_PATH"
+	echo
+fi
+
+# Validates if declared directory exists
+if [ -e $WAR_DIRECTORY ]; then
+
+	# Validates if the declared directory is a directory
+	if [[ -d $WAR_DIRECTORY ]]; then
+		# Go to war directory
+		cd $WAR_DIRECTORY
+
+		show_debug_message "Inside folder $WAR_DIRECTORY"
+
+		# Loop in war files
+		for file in *.war; do
+
+			# Validates the existence of .war files
+			if [ "$file" == "*.war" ]; then
+				show_info_message_and_exit "No war to extract"
+			else
+				if [ "$(will_crop_path)" ]; then
+					# Crop file name to set directory to extract
+					show_debug_message "Cropping file name"
+
+					# crop using '-' suffix
+					directory=$(echo $file | cut -f 1 -d '-')
+					if [ "$directory" == "$file" ]; then
+						##############################################
+						# # crop using '_' suffix
+						# $directory=$(echo $file | cut -f 1 -d '_')
+						#
+						# if [ "$directory" == "$file" ]; then
+						# 	# crop using '.' suffix
+						# 	$directory=$(echo $file | cut -f 1 -d '.')
+						# fi
+						###############################################
+
+						# crop using '.war' suffix
+						directory="${file%.war}"
+					fi
+				else
+					# crop using '.war' suffix
+					directory="${file%.war}"
+				fi
+
+				show_debug_message "The extracted files will be placed in $WAR_DIRECTORY/$directory"
+
+				# Remove the directory, if it exists
+				if [ -e "$directory" ]; then
+					show_debug_message "The directory $WAR_DIRECTORY/$directory already exists, removing him"
+
+					rm -rf $WAR_DIRECTORY/$directory;
+				fi
+
+				# Extract the .war to the directory
+				show_debug_message "Extracting '$WAR_DIRECTORY/$file' to '$WAR_DIRECTORY/$directory'"
+
+				unzip -q -d "$WAR_DIRECTORY/$directory" "$WAR_DIRECTORY/$file" > $output_path
+				output=$(cat $output_path)
+
+				# if the command should not show any output
+				if ! will_show_debug_messages; then
+
+					# if unzip command has any output
+					if [ ! -z "$output" -a "$output" != " " ]; then
+
+						# show unzip output and exit
+						cat $output_path
+
+						show_error_message_and_exit "Error to unzip file '$WAR_DIRECTORY/$file' to '$WAR_DIRECTORY/$directory'"
+					fi
+				fi
+
+				# Remove war file
+				show_debug_message "Removing file '$file'"
+
+				rm -rf $WAR_DIRECTORY/$file;
+
+				show_debug_message ""
+			fi
+		done
+	else
+		show_error_message_and_exit "'$WAR_DIRECTORY' isn't a directory"
+	fi
+else
+	show_error_message_and_exit "Directory '$WAR_DIRECTORY' does not exists"
+fi
+
+clear_output_file
+
